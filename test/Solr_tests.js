@@ -12,6 +12,57 @@ var Expect = Chai.expect;
 var libFable = require('fable');
 var libMeadowConnectionSolr = require('../source/Meadow-Connection-Solr.js');
 
+var _FableConfig = (
+	{
+		"Product": "MeadowSolrConnectionTest",
+		"ProductVersion": "1.0.0",
+
+		"UUID":
+			{
+				"DataCenter": 0,
+				"Worker": 0
+			},
+		"LogStreams":
+			[
+				{
+					"streamtype": "console"
+				}
+			],
+
+		"Solr":
+			{
+				"Server": "127.0.0.1",
+				"Port": 18983,
+				"Core": "meadow_conn_test"
+			}
+	});
+
+var _AnimalSchema = {
+	TableName: 'Animal',
+	Columns: [
+		{ Column: 'IDAnimal', DataType: 'ID' },
+		{ Column: 'GUIDAnimal', DataType: 'GUID' },
+		{ Column: 'Name', DataType: 'String' },
+		{ Column: 'Age', DataType: 'Numeric' },
+		{ Column: 'Weight', DataType: 'Decimal' },
+		{ Column: 'Description', DataType: 'Text' },
+		{ Column: 'Birthday', DataType: 'DateTime' },
+		{ Column: 'Active', DataType: 'Boolean' },
+		{ Column: 'IDFarm', DataType: 'ForeignKey' }
+	]
+};
+
+var _VehicleSchema = {
+	TableName: 'Vehicle',
+	Columns: [
+		{ Column: 'IDVehicle', DataType: 'ID' },
+		{ Column: 'GUIDVehicle', DataType: 'GUID' },
+		{ Column: 'Make', DataType: 'String' },
+		{ Column: 'Model', DataType: 'String' },
+		{ Column: 'Year', DataType: 'Numeric' }
+	]
+};
+
 suite
 (
 	'Meadow-Connection-Solr',
@@ -87,7 +138,7 @@ suite
 					'generate a Solr field schema descriptor for a table',
 					function()
 					{
-						var tmpFable = new libFable({Product:'SolrConnectionTest', Solr:{Server:'localhost', Port:8983}});
+						var tmpFable = new libFable(_FableConfig);
 						tmpFable.serviceManager.addServiceType('MeadowProvider', libMeadowConnectionSolr);
 						var tmpProvider = tmpFable.serviceManager.instantiateServiceProvider('MeadowProvider');
 
@@ -132,7 +183,7 @@ suite
 					'generate a drop collection descriptor',
 					function()
 					{
-						var tmpFable = new libFable({Product:'SolrConnectionTest', Solr:{Server:'localhost', Port:8983}});
+						var tmpFable = new libFable(_FableConfig);
 						tmpFable.serviceManager.addServiceType('MeadowProvider', libMeadowConnectionSolr);
 						var tmpProvider = tmpFable.serviceManager.instantiateServiceProvider('MeadowProvider');
 
@@ -183,6 +234,368 @@ suite
 						tmpFable.serviceManager.addServiceType('MeadowProvider', libMeadowConnectionSolr);
 						var tmpProvider = tmpFable.serviceManager.instantiateServiceProvider('MeadowProvider');
 						Expect(tmpProvider._buildConnectionURL()).to.equal('http://localhost:8983/solr/default');
+					}
+				);
+			}
+		);
+
+		suite
+		(
+			'Connection',
+			function()
+			{
+				test
+				(
+					'connect with default fable.settings',
+					function(fDone)
+					{
+						var tmpFable = new libFable(_FableConfig);
+						tmpFable.serviceManager.addServiceType('MeadowSolrProvider', libMeadowConnectionSolr);
+						tmpFable.serviceManager.instantiateServiceProvider('MeadowSolrProvider');
+
+						Expect(tmpFable.MeadowSolrProvider.connected).to.equal(false);
+
+						tmpFable.MeadowSolrProvider.connect();
+
+						Expect(tmpFable.MeadowSolrProvider.connected).to.equal(true);
+						Expect(tmpFable.MeadowSolrProvider.pool).to.be.an('object');
+
+						// Verify we can actually communicate with Solr
+						tmpFable.MeadowSolrProvider.pool.ping(
+							function(pError, pResult)
+							{
+								Expect(pError).to.equal(null);
+								Expect(pResult).to.be.an('object');
+								Expect(pResult.status).to.equal('OK');
+								return fDone();
+							});
+					}
+				);
+				test
+				(
+					'connectAsync callback',
+					function(fDone)
+					{
+						var tmpFable = new libFable(_FableConfig);
+						tmpFable.serviceManager.addServiceType('MeadowSolrProvider', libMeadowConnectionSolr);
+						tmpFable.serviceManager.instantiateServiceProvider('MeadowSolrProvider');
+
+						tmpFable.MeadowSolrProvider.connectAsync(
+							function(pError, pClient)
+							{
+								Expect(pError).to.equal(null);
+								Expect(pClient).to.be.an('object');
+								Expect(tmpFable.MeadowSolrProvider.connected).to.equal(true);
+								Expect(tmpFable.MeadowSolrProvider.pool).to.equal(pClient);
+
+								return fDone();
+							});
+					}
+				);
+				test
+				(
+					'autoconnect via MeadowConnectionSolrAutoConnect',
+					function(fDone)
+					{
+						var tmpConfig = JSON.parse(JSON.stringify(_FableConfig));
+						tmpConfig.MeadowConnectionSolrAutoConnect = true;
+
+						var tmpFable = new libFable(tmpConfig);
+						tmpFable.serviceManager.addAndInstantiateServiceType('MeadowSolrProvider', libMeadowConnectionSolr);
+
+						Expect(tmpFable.MeadowSolrProvider.connected).to.equal(true);
+						Expect(tmpFable.MeadowSolrProvider.pool).to.be.an('object');
+
+						tmpFable.MeadowSolrProvider.pool.ping(
+							function(pError, pResult)
+							{
+								Expect(pError).to.equal(null);
+								Expect(pResult.status).to.equal('OK');
+								return fDone();
+							});
+					}
+				);
+				test
+				(
+					'connect when already connected logs error and does not throw',
+					function()
+					{
+						var tmpFable = new libFable(_FableConfig);
+						tmpFable.serviceManager.addServiceType('MeadowSolrProvider', libMeadowConnectionSolr);
+						tmpFable.serviceManager.instantiateServiceProvider('MeadowSolrProvider');
+
+						tmpFable.MeadowSolrProvider.connect();
+						Expect(tmpFable.MeadowSolrProvider.connected).to.equal(true);
+
+						// Second connect should not throw
+						tmpFable.MeadowSolrProvider.connect();
+						Expect(tmpFable.MeadowSolrProvider.connected).to.equal(true);
+					}
+				);
+				test
+				(
+					'pass in your own settings and connect',
+					function(fDone)
+					{
+						var tmpFable = new libFable();
+						tmpFable.serviceManager.addServiceType('MeadowSolrProvider', libMeadowConnectionSolr);
+						tmpFable.serviceManager.instantiateServiceProvider('MeadowSolrProvider', {Solr: _FableConfig.Solr});
+
+						tmpFable.MeadowSolrProvider.connect();
+
+						Expect(tmpFable.MeadowSolrProvider.connected).to.equal(true);
+
+						tmpFable.MeadowSolrProvider.pool.ping(
+							function(pError, pResult)
+							{
+								Expect(pError).to.equal(null);
+								Expect(pResult.status).to.equal('OK');
+								return fDone();
+							});
+					}
+				);
+			}
+		);
+
+		suite
+		(
+			'Schema Execution',
+			function()
+			{
+				var _Fable = null;
+
+				suiteSetup
+				(
+					function(fDone)
+					{
+						_Fable = new libFable(_FableConfig);
+						_Fable.serviceManager.addServiceType('MeadowSolrProvider', libMeadowConnectionSolr);
+						_Fable.serviceManager.instantiateServiceProvider('MeadowSolrProvider');
+						_Fable.MeadowSolrProvider.connect();
+						fDone();
+					}
+				);
+
+				test
+				(
+					'createTable calls back without error when connected',
+					function(fDone)
+					{
+						_Fable.MeadowSolrProvider.createTable(_AnimalSchema,
+							function(pError)
+							{
+								Expect(pError).to.not.be.an('error');
+								return fDone();
+							});
+					}
+				);
+				test
+				(
+					'createTables processes multiple schemas',
+					function(fDone)
+					{
+						var tmpMultiSchema = {
+							Tables: [_AnimalSchema, _VehicleSchema]
+						};
+
+						_Fable.MeadowSolrProvider.createTables(tmpMultiSchema,
+							function(pError)
+							{
+								Expect(pError).to.not.be.an('error');
+								return fDone();
+							});
+					}
+				);
+				test
+				(
+					'createTable when not connected returns error',
+					function(fDone)
+					{
+						// Create a disconnected provider (no connect() call)
+						var tmpFable = new libFable(_FableConfig);
+						tmpFable.serviceManager.addServiceType('MeadowSolrProvider', libMeadowConnectionSolr);
+						tmpFable.serviceManager.instantiateServiceProvider('MeadowSolrProvider');
+
+						tmpFable.MeadowSolrProvider.createTable(_AnimalSchema,
+							function(pError)
+							{
+								Expect(pError).to.be.an('error');
+								Expect(pError.message).to.contain('Not connected');
+								return fDone();
+							});
+					}
+				);
+			}
+		);
+
+		suite
+		(
+			'Raw Solr Operations',
+			function()
+			{
+				var _Fable = null;
+
+				suiteSetup
+				(
+					function(fDone)
+					{
+						_Fable = new libFable(_FableConfig);
+						_Fable.serviceManager.addServiceType('MeadowSolrProvider', libMeadowConnectionSolr);
+						_Fable.serviceManager.instantiateServiceProvider('MeadowSolrProvider');
+						_Fable.MeadowSolrProvider.connect();
+
+						// Clear any existing documents before starting
+						_Fable.MeadowSolrProvider.pool.deleteAll(
+							function(pError)
+							{
+								if (pError)
+								{
+									return fDone(pError);
+								}
+								_Fable.MeadowSolrProvider.pool.commit(
+									function(pCommitError)
+									{
+										return fDone(pCommitError);
+									});
+							});
+					}
+				);
+
+				suiteTeardown
+				(
+					function(fDone)
+					{
+						// Clean up all documents
+						_Fable.MeadowSolrProvider.pool.deleteAll(
+							function(pError)
+							{
+								if (pError)
+								{
+									return fDone(pError);
+								}
+								_Fable.MeadowSolrProvider.pool.commit(
+									function(pCommitError)
+									{
+										return fDone(pCommitError);
+									});
+							});
+					}
+				);
+
+				test
+				(
+					'add and search documents',
+					function(fDone)
+					{
+						var tmpClient = _Fable.MeadowSolrProvider.pool;
+
+						var tmpDocs = [
+							{ id: 'animal-1', IDAnimal: 1, Name: 'Fido', Type: 'Dog', Age: 5 },
+							{ id: 'animal-2', IDAnimal: 2, Name: 'Whiskers', Type: 'Cat', Age: 3 },
+							{ id: 'animal-3', IDAnimal: 3, Name: 'Polly', Type: 'Parrot', Age: 7 }
+						];
+
+						tmpClient.add(tmpDocs,
+							function(pAddError)
+							{
+								Expect(pAddError).to.equal(null);
+
+								tmpClient.commit(
+									function(pCommitError)
+									{
+										Expect(pCommitError).to.equal(null);
+
+										var tmpQuery = tmpClient.query().q('*:*').sort({ IDAnimal: 'asc' }).rows(10);
+										tmpClient.search(tmpQuery,
+											function(pSearchError, pResult)
+											{
+												Expect(pSearchError).to.equal(null);
+												Expect(pResult).to.be.an('object');
+												Expect(pResult.response.numFound).to.equal(3);
+												Expect(pResult.response.docs[0].Name).to.equal('Fido');
+												Expect(pResult.response.docs[1].Name).to.equal('Whiskers');
+												Expect(pResult.response.docs[2].Name).to.equal('Polly');
+												return fDone();
+											});
+									});
+							});
+					}
+				);
+				test
+				(
+					'search with filter query',
+					function(fDone)
+					{
+						var tmpClient = _Fable.MeadowSolrProvider.pool;
+
+						var tmpQuery = tmpClient.query().q('Type:Dog');
+						tmpClient.search(tmpQuery,
+							function(pSearchError, pResult)
+							{
+								Expect(pSearchError).to.equal(null);
+								Expect(pResult.response.numFound).to.equal(1);
+								Expect(pResult.response.docs[0].Name).to.equal('Fido');
+								Expect(pResult.response.docs[0].Type).to.equal('Dog');
+								return fDone();
+							});
+					}
+				);
+				test
+				(
+					'delete a document by query',
+					function(fDone)
+					{
+						var tmpClient = _Fable.MeadowSolrProvider.pool;
+
+						tmpClient.delete('id', 'animal-3',
+							function(pDeleteError)
+							{
+								Expect(pDeleteError).to.equal(null);
+
+								tmpClient.commit(
+									function(pCommitError)
+									{
+										Expect(pCommitError).to.equal(null);
+
+										var tmpQuery = tmpClient.query().q('*:*');
+										tmpClient.search(tmpQuery,
+											function(pSearchError, pResult)
+											{
+												Expect(pSearchError).to.equal(null);
+												Expect(pResult.response.numFound).to.equal(2);
+												return fDone();
+											});
+									});
+							});
+					}
+				);
+				test
+				(
+					'delete all and verify empty',
+					function(fDone)
+					{
+						var tmpClient = _Fable.MeadowSolrProvider.pool;
+
+						tmpClient.deleteAll(
+							function(pDeleteError)
+							{
+								Expect(pDeleteError).to.equal(null);
+
+								tmpClient.commit(
+									function(pCommitError)
+									{
+										Expect(pCommitError).to.equal(null);
+
+										var tmpQuery = tmpClient.query().q('*:*');
+										tmpClient.search(tmpQuery,
+											function(pSearchError, pResult)
+											{
+												Expect(pSearchError).to.equal(null);
+												Expect(pResult.response.numFound).to.equal(0);
+												return fDone();
+											});
+									});
+							});
 					}
 				);
 			}

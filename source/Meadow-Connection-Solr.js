@@ -4,6 +4,8 @@
 */
 const libFableServiceProviderBase = require('fable-serviceproviderbase');
 
+const libMeadowSchemaSolr = require('./Meadow-Schema-Solr.js');
+
 let libSolr = false;
 try
 {
@@ -67,10 +69,18 @@ class MeadowConnectionSolr extends libFableServiceProviderBase
 		this._Client = false;
 		this.connected = false;
 
+		// Schema provider handles DDL operations (create, drop, index, etc.)
+		this._SchemaProvider = new libMeadowSchemaSolr(this.fable, this.options, `${this.Hash}-Schema`);
+
 		if (this.options.MeadowConnectionSolrAutoConnect)
 		{
 			this.connect();
 		}
+	}
+
+	get schemaProvider()
+	{
+		return this._SchemaProvider;
 	}
 
 	/**
@@ -91,98 +101,22 @@ class MeadowConnectionSolr extends libFableServiceProviderBase
 
 	generateDropTableStatement(pTableName)
 	{
-		// Returns a descriptor for dropping a Solr collection
-		return { operation: 'dropCollection', collection: pTableName };
+		return this._SchemaProvider.generateDropTableStatement(pTableName);
 	}
 
 	generateCreateTableStatement(pMeadowTableSchema)
 	{
-		this.log.info(`--> Building the Solr schema for ${pMeadowTableSchema.TableName} ...`);
-
-		let tmpFields = [];
-
-		for (let j = 0; j < pMeadowTableSchema.Columns.length; j++)
-		{
-			let tmpColumn = pMeadowTableSchema.Columns[j];
-			let tmpFieldName = tmpColumn.Column;
-			let tmpFieldType = 'string';
-
-			switch (tmpColumn.DataType)
-			{
-				case 'ID':
-					tmpFieldType = 'pint';
-					break;
-				case 'GUID':
-					tmpFieldType = 'string';
-					break;
-				case 'ForeignKey':
-					tmpFieldType = 'pint';
-					break;
-				case 'Numeric':
-					tmpFieldType = 'pint';
-					break;
-				case 'Decimal':
-					tmpFieldType = 'pfloat';
-					break;
-				case 'String':
-					tmpFieldType = 'string';
-					break;
-				case 'Text':
-					tmpFieldType = 'text_general';
-					break;
-				case 'DateTime':
-					tmpFieldType = 'pdate';
-					break;
-				case 'Boolean':
-					tmpFieldType = 'pint';
-					break;
-				default:
-					tmpFieldType = 'string';
-					break;
-			}
-
-			tmpFields.push({ name: tmpFieldName, type: tmpFieldType });
-		}
-
-		return {
-			operation: 'schemaUpdate',
-			collection: pMeadowTableSchema.TableName,
-			fields: tmpFields
-		};
+		return this._SchemaProvider.generateCreateTableStatement(pMeadowTableSchema);
 	}
 
 	createTables(pMeadowSchema, fCallback)
 	{
-		this.fable.Utility.eachLimit(pMeadowSchema.Tables, 1,
-			(pTable, fCreateComplete) =>
-			{
-				return this.createTable(pTable, fCreateComplete);
-			},
-			(pCreateError) =>
-			{
-				if (pCreateError)
-				{
-					this.log.error(`Meadow-Solr Error creating schemas: ${pCreateError}`, pCreateError);
-				}
-				this.log.info('Done creating Solr schemas!');
-				return fCallback(pCreateError);
-			});
+		return this._SchemaProvider.createTables(pMeadowSchema, fCallback);
 	}
 
 	createTable(pMeadowTableSchema, fCallback)
 	{
-		let tmpDescriptor = this.generateCreateTableStatement(pMeadowTableSchema);
-
-		if (!this._Client)
-		{
-			this.log.error(`Meadow-Solr CREATE SCHEMA for ${tmpDescriptor.collection} failed: not connected.`);
-			return fCallback(new Error('Not connected to Solr'));
-		}
-
-		// For Solr, schema updates are done via the Schema API
-		// This would typically be a POST to /solr/<collection>/schema
-		this.log.info(`Meadow-Solr schema for ${tmpDescriptor.collection} prepared (${tmpDescriptor.fields.length} fields).`);
-		return fCallback();
+		return this._SchemaProvider.createTable(pMeadowTableSchema, fCallback);
 	}
 
 	connect()
@@ -214,6 +148,7 @@ class MeadowConnectionSolr extends libFableServiceProviderBase
 			});
 
 		this.connected = true;
+		this._SchemaProvider.setClient(this._Client);
 	}
 
 	connectAsync(fCallback)

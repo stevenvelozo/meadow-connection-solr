@@ -1,11 +1,15 @@
 {
 	"name": "meadow-connection-solr",
-	"version": "1.0.1",
+	"version": "1.0.2",
 	"description": "Meadow Solr Connection Plugin",
 	"main": "source/Meadow-Connection-Solr.js",
 	"scripts": {
 		"coverage": "npx quack coverage",
-		"test": "npx quack test"
+		"test": "npx quack test",
+		"docker-solr-start": "bash ./scripts/solr-test-db.sh start",
+		"docker-solr-stop": "bash ./scripts/solr-test-db.sh stop",
+		"docker-solr-status": "bash ./scripts/solr-test-db.sh status",
+		"test-docker": "bash ./scripts/solr-test-db.sh start && npm test"
 	},
 	"mocha": {
 		"diff": true,
@@ -15,7 +19,7 @@
 		"package": "./package.json",
 		"reporter": "spec",
 		"slow": "75",
-		"timeout": "5000",
+		"timeout": "10000",
 		"ui": "tdd",
 		"watch-files": [
 			"source/**/*.js",
@@ -31,11 +35,11 @@
 	"author": "Steven Velozo <steven@velozo.com>",
 	"license": "MIT",
 	"dependencies": {
-		"fable-serviceproviderbase": "^3.0.18",
+		"fable-serviceproviderbase": "^3.0.19",
 		"solr-client": "^0.9.0"
 	},
 	"devDependencies": {
-		"fable": "^3.1.55",
-		"quackage": "^1.0.58"
+		"fable": "^3.1.63",
+		"quackage": "^1.0.59"
 	}
 }
