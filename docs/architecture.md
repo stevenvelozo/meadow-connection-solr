@@ -40,7 +40,7 @@ sequenceDiagram
 	Fable->>MCS: constructor(fable, options)
 	MCS->>MCS: Read Solr config
 	MCS->>MCS: Normalize property names
-	Note over MCS: Server→host, Port→port,<br/>Core→core, Path→path, Secure→secure
+	Note over MCS: Server->host, Port->port,<br/>Core->core, Path->path, Secure->secure
 
 	alt Auto-Connect Enabled
 		MCS->>MCS: connect()
@@ -104,7 +104,7 @@ flowchart LR
 		SET[fable.settings.Solr]
 	end
 	subgraph Normalization
-		NORM["Property Mapping<br/>Server → host<br/>Port → port<br/>Core → core<br/>Path → path<br/>Secure → secure"]
+		NORM["Property Mapping<br/>Server -> host<br/>Port -> port<br/>Core -> core<br/>Path -> path<br/>Secure -> secure"]
 	end
 	subgraph Output
 		URL["Connection URL<br/>http[s]://host:port/path/core"]
