@@ -1,6 +1,6 @@
 {
 	"name": "meadow-connection-solr",
-	"version": "1.0.2",
+	"version": "1.0.3",
 	"description": "Meadow Solr Connection Plugin",
 	"main": "source/Meadow-Connection-Solr.js",
 	"scripts": {
